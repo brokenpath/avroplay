@@ -1,0 +1,9 @@
+{
+    "namespace": "tryllerylle",
+    "name": "benchrows",
+    "type": "record",
+    "fields" : [
+        {"name" : "firstfield", "type": "string" },
+        {"name" : "secondfield", "type": "string" }
+    ]
+}

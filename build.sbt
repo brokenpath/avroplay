@@ -13,11 +13,18 @@ lazy val root = (project in file(".")).
     parallelExecution in Test := false,
     fork := true,
     testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
+    sourceGenerators in Compile += (avroScalaGenerateSpecific in Compile).taskValue,
+
+    avroScalaSpecificCustomTypes in Compile := {
+      avrohugger.format.SpecificRecord.defaultTypes.copy(
+        record = avrohugger.types.ScalaCaseClassWithSchema)
+    },
 
     libraryDependencies ++= Seq(
 
         "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided",
-        "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+        "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+        "org.apache.avro" % "avro" % "1.8.2" % "provided"
     )
 
     
