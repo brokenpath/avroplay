@@ -1,3 +1,5 @@
+
+lazy val hadoopVersion = "3.0.1"
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
@@ -24,7 +26,12 @@ lazy val root = (project in file(".")).
 
         "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided",
         "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-        "org.apache.avro" % "avro" % "1.8.2" % "provided"
+        "org.apache.avro" % "avro" % "1.8.2" % "provided",
+        "org.apache.hadoop" % "hadoop-client"      % hadoopVersion,
+        "org.apache.hadoop" % "hadoop-common"      % hadoopVersion,
+        "org.apache.hadoop" % "hadoop-hdfs"        % hadoopVersion,
+        "org.apache.hadoop" % "hadoop-minicluster" % hadoopVersion % Test,
+        "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
     )
 
     
