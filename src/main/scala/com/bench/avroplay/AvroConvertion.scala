@@ -3,7 +3,7 @@ package com.bench.avroplay
 import org.apache.avro._
 import org.apache.avro.file.{DataFileStream, DataFileWriter}
 import org.apache.spark.{SparkConf, SparkContext} 
-import trylerylle._
+import tryllerylle._
 import org.apache.avro.specific.SpecificRecordBase
 import collection.JavaConverters._
 import org.apache.avro.specific.SpecificDatumReader
@@ -35,10 +35,7 @@ object Runner {
                     .filter(r => r.firstfield == "nogo")
                 
 
-                try{
-
-                }
-
+                
                 inputStream.close() //is this necesarry 
 
         }

@@ -6,7 +6,7 @@ import org.apache.log4j.{Logger, Level}
 trait SparkSessionTestWrapper {
 
   lazy val spark: SparkSession = {
-    Logger.getLogger("org").setLevel(Level.OFF)
+    // Logger.getLogger("org").setLevel(Level.OFF)
     SparkSession.builder().master("local").appName("spark session").getOrCreate()
   }
 

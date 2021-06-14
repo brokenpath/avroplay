@@ -8,8 +8,10 @@ import org.scalatest.FunSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.apache.hadoop.hdfs.{HdfsConfiguration, MiniDFSCluster}
 
-class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with SparkSessionTestWrapper {
+class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach // with SparkSessionTestWrapper
+{
 
+  private val SMALL_BLOCKSIZE = 1024l
   private var miniHdfs: MiniDFSCluster = _
   private val dir = "./temp/hadoop"
   private val port: Int = 54310
@@ -22,29 +24,46 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
   ) //needed for performing append operation on hadoop-minicluster
   val fs: FileSystem = FileSystem.get(conf)
 
-    describe("hasFiles") {
-        it("create file add, data and see its there") {
-            new HdfsFixture {
-                val path: Path = new Path(genFileName.sample.get)
-                val out = fs.create(path)
-                out.write(genChunk.sample.get)
-                out.close()
-                val homeDir = fs.getHomeDirectory().getName()
-                val f : File = new File("/user/" + homeDir)
-                val files = f.listFiles()
-                print(files)
+  describe("hasFiles") {
+      it("create file add, data and see its there") {
+        println("")
+        println("*********************************")
+        println("*********************************")
+        println("*********************************")
+          new HdfsFixture {
+              val path: Path = new Path(genFileName.sample.get)
+              val defaults = fs.getServerDefaults(path)
+              val out = fs.create(path, true, defaults.getFileBufferSize(), defaults.getReplication(), SMALL_BLOCKSIZE)
+              out.write(genChunk.sample.get)
+              out.close()
+              val homeDir = fs.getHomeDirectory()
 
+              val files = fs.listStatus(homeDir)
 
+              
+            for ( file <- files) {
+              println("--------------------------------------------------")
+              println(file)
+              println("--------------------------------------------------")
             }
 
+            
+          }
 
-        }
-    }
+        println("###################################")
+        println("###################################")
+        println("###################################")
+          
+          
+      }
+  }
 
 
    override protected def beforeAll(): Unit = {
     val baseDir: File = new File(dir, "test")
     val miniDfsConf: HdfsConfiguration = new HdfsConfiguration
+    
+    miniDfsConf.set("dfs.namenode.fs-limits.min-block-size", "1024")
     miniDfsConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, baseDir.getAbsolutePath)
     miniHdfs = new MiniDFSCluster.Builder(miniDfsConf)
       .nameNodePort(port)
@@ -55,6 +74,7 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
 
   override protected def afterAll(): Unit = {
     fs.close()
+    
     miniHdfs.shutdown()
   }
 
