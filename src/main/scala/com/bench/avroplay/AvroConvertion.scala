@@ -10,6 +10,13 @@ import org.apache.avro.specific.SpecificDatumReader
 import tryllerylle.benchrows
 import org.apache.spark.rdd.RDD
 import org.apache.spark.input.PortableDataStream
+import scala.util.Try
+import scala.util.Failure
+import scala.util.Success
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.avro.specific.SpecificDatumWriter
+import java.io.File
 
 object Main extends App {
     val (inputFile, outputFile) = (args(0), args(1))
@@ -26,14 +33,29 @@ object Runner {
 
 
     /*
-        Map to vector and reduceByKey. 
-        PortableDataStream is unopened we need to somehow do a foreach with a sideeffect open the file
-        write loop though each datastream and close it.
+        Fix writer, ensure also correct compression snappy is used
         
     */
-    def mergeAvro(rdd: RDD[(String, (String, PortableDataStream))]) : Unit = {
-        
-        
+    def compactAvroFiles[T <: SpecificRecordBase](fileAvro: (String, Vector[(String, PortableDataStream)]))(implicit conf: Configuration, t: T) : Unit = {
+        Try{
+            val fs = FileSystem.get(conf)
+            val path  = new Path( fileAvro._1)
+            val defaults = fs.getServerDefaults(path)
+            val out = fs.create(path, true, defaults.getFileBufferSize(), defaults.getReplication(), defaults.getBlockSize())
+            val datumWriter = new SpecificDatumWriter[T]()
+            val fileWriter = new DataFileWriter[T](datumWriter, out) 
+            val datumReader = new SpecificDatumReader[T](t.getSchema())
+            fileAvro._2.foreach{
+                case (filename, stream) =>
+                    val input = stream.open()
+            }
+
+
+
+        } match {
+            case Failure(exception) => ???
+            case Success(value) => ???
+        }
     }
 
     def run(conf: SparkConf, path: String, outputFolder: String): Unit = {
