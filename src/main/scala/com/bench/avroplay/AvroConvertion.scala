@@ -18,6 +18,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.avro.specific.SpecificDatumWriter
 import java.io.File
 import org.apache.avro.file.DataFileReader
+import org.apache.hadoop.fs.FsServerDefaults
 
 object Main extends App {
     val (inputFile, outputFile) = (args(0), args(1))
@@ -29,6 +30,22 @@ case class AvroFileGroups()
 
 object Runner {
     val HADOOP_BLOCK_SIZE = 128 * 1024 * 1024  // improvement get dynamically from hdfs
+
+
+
+    def writeRecord[T <: SpecificRecordBase](
+        record : T, 
+        path: String, 
+        fs: FileSystem) = {
+            val hdfsPath: Path = new Path(path)
+            val out = fs.create(hdfsPath, true)
+            val datumWriter = new SpecificDatumWriter[T]()
+            val dataFileWriter = new DataFileWriter[T](datumWriter) 
+
+            val outputWriter = dataFileWriter.create(record.getSchema(), out)
+            outputWriter.append(record)
+            out.close()
+    }
 
     /*
         Fix writer, ensure also correct compression snappy is used
