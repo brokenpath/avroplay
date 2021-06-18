@@ -17,6 +17,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.avro.specific.SpecificDatumWriter
 import java.io.File
+import org.apache.avro.file.DataFileReader
 
 object Main extends App {
     val (inputFile, outputFile) = (args(0), args(1))
@@ -29,9 +30,6 @@ case class AvroFileGroups()
 object Runner {
     val HADOOP_BLOCK_SIZE = 128 * 1024 * 1024  // improvement get dynamically from hdfs
 
-
-
-
     /*
         Fix writer, ensure also correct compression snappy is used
         
@@ -43,15 +41,22 @@ object Runner {
             val defaults = fs.getServerDefaults(path)
             val out = fs.create(path, true, defaults.getFileBufferSize(), defaults.getReplication(), defaults.getBlockSize())
             val datumWriter = new SpecificDatumWriter[T]()
-            val fileWriter = new DataFileWriter[T](datumWriter, out) 
+            val dataFileWriter = new DataFileWriter[T](datumWriter) 
             val datumReader = new SpecificDatumReader[T](t.getSchema())
+            val outputWriter = dataFileWriter.create(t.getSchema(), out)
+            var reuse : T = t
+
             fileAvro._2.foreach{
                 case (filename, stream) =>
                     val input = stream.open()
+                    val reader = new DataFileStream[T](input, datumReader)
+                    while(reader.hasNext()){
+                        reuse = reader.next(reuse)
+                        outputWriter.append(reuse)
+                    }
+                    input.close()
             }
-
-
-
+            outputWriter.close()
         } match {
             case Failure(exception) => ???
             case Success(value) => ???
@@ -74,11 +79,7 @@ object Runner {
                     .map(r => r.copy(secondfield =  "i made it") )
                     .filter(r => r.firstfield == "nogo")
                 
-
-                
                 inputStream.close() //is this necesarry 
-
         }
-        
     }
 }
