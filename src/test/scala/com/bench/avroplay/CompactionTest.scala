@@ -10,7 +10,7 @@ import org.apache.hadoop.hdfs.{HdfsConfiguration, MiniDFSCluster}
 import org.apache.log4j.{Logger, Level}
 import tryllerylle._
 
-class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach // with SparkSessionTestWrapper
+class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach  with SparkSessionTestWrapper
 {
 
     private val SMALL_BLOCKSIZE = 1024l
@@ -72,7 +72,13 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 val record = new tryllerylle.benchrows("012345678", "9ABCDEFG")
                 var records = (1 to 20).toList.map(i => record)
                 filenames.foreach(filename => AvroCompactor.writeRecords(records, filename, fs))
-                // How do we initiate a PortableStream for tests....
+                val homeDir = fs.getHomeDirectory()
+                val files = spark.sparkContext.binaryFiles(homeDir.toString())
+                println("ITS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% HAPPENING")
+                files.foreach{
+                    case (filename, stream) => println(filename)
+                }
+                println("ITTTTTT ended ...")
             }
         }
     }

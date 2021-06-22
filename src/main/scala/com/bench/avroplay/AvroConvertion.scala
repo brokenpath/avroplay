@@ -87,8 +87,8 @@ object AvroCompactor{
             }
             outputWriter.close()
         } match {
-            case Failure(exception) => ???
-            case Success(value) => ???
+            case Failure(exception) => throw exception // TODO : maybe some bookmarking for error handling like file names etc.
+            case Success(value) => println("compacted files")
         }
     }
 }

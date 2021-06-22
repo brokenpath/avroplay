@@ -32,6 +32,12 @@ lazy val root = (project in file(".")).
         "org.apache.hadoop" % "hadoop-hdfs"        % hadoopVersion,
         "org.apache.hadoop" % "hadoop-minicluster" % hadoopVersion % Test,
         "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
+    ),
+    // Align dependencies to spark 2.4 or dependency hell will follow
+    dependencyOverrides ++= Seq( 
+      "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7",
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7.1",
+      "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.6.7"
     )
 
     
