@@ -1,7 +1,7 @@
 package com.bench.avroplay
 
 import org.apache.avro._
-import org.apache.avro.file.{DataFileStream, DataFileWriter}
+import org.apache.avro.file.{DataFileStream, DataFileWriter, DataFileReader}
 import org.apache.spark.{SparkConf, SparkContext} 
 import tryllerylle._
 import org.apache.avro.specific.SpecificRecordBase
@@ -19,6 +19,8 @@ import org.apache.avro.specific.SpecificDatumWriter
 import java.io.File
 import org.apache.avro.file.DataFileReader
 import org.apache.hadoop.fs.FsServerDefaults
+import org.apache.avro.file.SeekableFileInput
+import java.{util => ju}
 
 object Main extends App {
     val (inputFile, outputFile) = (args(0), args(1))
@@ -26,30 +28,40 @@ object Main extends App {
 }
 
 
-case class AvroFileGroups()
-
-object Runner {
-    val HADOOP_BLOCK_SIZE = 128 * 1024 * 1024  // improvement get dynamically from hdfs
-
-
-
-    def writeRecord[T <: SpecificRecordBase](
-        record : T, 
+object AvroCompactor{
+    //Test method likely to be moved
+    def writeRecords[T <: SpecificRecordBase](
+        records : List[T], 
         path: String, 
         fs: FileSystem) = {
             val hdfsPath: Path = new Path(path)
             val out = fs.create(hdfsPath, true)
             val datumWriter = new SpecificDatumWriter[T]()
             val dataFileWriter = new DataFileWriter[T](datumWriter) 
-
+            val record = records.head
             val outputWriter = dataFileWriter.create(record.getSchema(), out)
-            outputWriter.append(record)
-            out.close()
+            for(r <- records) outputWriter.append(r)
+            outputWriter.close()
     }
+
+    //Test method likely to be moved
+    def readRecords[T <: SpecificRecordBase](
+        schema: Schema,
+        path: String, 
+        fs: FileSystem) = {
+            val hdfsPath: Path = new Path(path)
+            val in = fs.open(hdfsPath)
+            val datumReader = new SpecificDatumReader[T](schema)
+            val reader : java.util.Iterator[T] =  new DataFileStream(in, datumReader) // Type inference failes :'(
+            
+            val records = for(record <- reader.asScala) yield record
+            in.close()
+            records
+        }
+
 
     /*
         Fix writer, ensure also correct compression snappy is used
-        
     */
     def compactAvroFiles[T <: SpecificRecordBase](fileAvro: (String, Vector[(String, PortableDataStream)]))(implicit conf: Configuration, t: T) : Unit = {
         Try{
@@ -79,6 +91,10 @@ object Runner {
             case Success(value) => ???
         }
     }
+}
+
+object Runner {
+    val HADOOP_BLOCK_SIZE = 128 * 1024 * 1024  // improvement get dynamically from hdfs
 
     def run(conf: SparkConf, path: String, outputFolder: String): Unit = {
         val sc = new SparkContext(conf)
