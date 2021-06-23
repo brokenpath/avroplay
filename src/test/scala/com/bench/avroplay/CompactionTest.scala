@@ -81,9 +81,6 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 assert(record == diskRecord)
             }
         }
-        it("compact a few files, and ensure schema is the same"){
-
-        }
         it("compact fixed number files into a a single file, and ensure same content"){
             new HdfsFixture {
                 val homeDir = fs.getHomeDirectory()
@@ -99,8 +96,6 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 var records = (1 to record_count).toList.map(i => record)
                 filenames.foreach(filename => AvroCompactor.writeRecords(records, filename, fs))
                 val files = spark.sparkContext.binaryFiles(badfilesDir.toString())
-                println("ITS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% HAPPENING")
-
                 
                 files.map(v => (TestHelpers.compactedFilename, Vector(v))).reduceByKey{
                     case (v1, v2) => v1 ++ v2
@@ -117,9 +112,10 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
 
                 assert(writtenRecords.length == file_count * record_count)
                 for (r <- writtenRecords) assert(r == TestHelpers.fixed_record())
-            
 
-                println("ITTTTTT ended ...")
+            }
+            it("compact a few files, and ensure schema is the same"){
+                
             }
         }
     }
