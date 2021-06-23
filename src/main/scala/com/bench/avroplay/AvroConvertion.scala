@@ -27,15 +27,15 @@ object Main extends App {
     Runner.run(new SparkConf(), inputFile, outputFile)
 }
 
+case class valueContainer(path: String)
 
 object AvroCompactor{
     //Test method likely to be moved
     def writeRecords[T <: SpecificRecordBase](
         records : List[T], 
-        path: String, 
+        path: Path, 
         fs: FileSystem) = {
-            val hdfsPath: Path = new Path(path)
-            val out = fs.create(hdfsPath, true)
+            val out = fs.create(path, true)
             val datumWriter = new SpecificDatumWriter[T]()
             val dataFileWriter = new DataFileWriter[T](datumWriter) 
             val record = records.head
@@ -47,10 +47,9 @@ object AvroCompactor{
     //Test method likely to be moved
     def readRecords[T <: SpecificRecordBase](
         schema: Schema,
-        path: String, 
+        path: Path, 
         fs: FileSystem) = {
-            val hdfsPath: Path = new Path(path)
-            val in = fs.open(hdfsPath)
+            val in = fs.open(path)
             val datumReader = new SpecificDatumReader[T](schema)
             val reader : java.util.Iterator[T] =  new DataFileStream(in, datumReader) // Type inference failes :'(
             

@@ -9,6 +9,32 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.apache.hadoop.hdfs.{HdfsConfiguration, MiniDFSCluster}
 import org.apache.log4j.{Logger, Level}
 import tryllerylle._
+import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.input.PortableDataStream
+
+
+object TestHelpers {
+    def test( t: (String, PortableDataStream ), s : String ) = 
+        (s, t) 
+
+    val port = 54310
+
+    def newConf() = {
+        val conf = new Configuration()
+        conf.set("fs.default.name", s"hdfs://localhost:$port")
+        conf.setBoolean("dfs.support.append", true)
+        conf.set(
+        "dfs.client.block.write.replace-datanode-on-failure.policy",
+        "NEVER"
+        )
+        conf
+    }
+
+    def fixed_record() = new tryllerylle.benchrows("012345678", "9ABCDEFG")
+
+    val compactedFilename = "compacted.avro"
+
+}
 
 class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach  with SparkSessionTestWrapper
 {
@@ -16,14 +42,7 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
     private val SMALL_BLOCKSIZE = 1024l
     private var miniHdfs: MiniDFSCluster = _
     private val dir = "./temp/hadoop"
-    private val port: Int = 54310
-    private val conf = new Configuration()
-    conf.set("fs.default.name", s"hdfs://localhost:$port")
-    conf.setBoolean("dfs.support.append", true)
-    conf.set(
-    "dfs.client.block.write.replace-datanode-on-failure.policy",
-    "NEVER"
-    ) //needed for performing append operation on hadoop-minicluster
+    private val conf = TestHelpers.newConf() //needed for performing append operation on hadoop-minicluster
     val fs: FileSystem = FileSystem.get(conf)
     Logger.getLogger("org").setLevel(Level.OFF)
 
@@ -53,11 +72,11 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
         }
         it("create a avro file, adds a record and reads it"){
             new HdfsFixture {
-                val filename = genFileName.sample.get
+                val path =  new Path(genFileName.sample.get)
                 val record = new tryllerylle.benchrows(genFileName.sample.get, genFileName.sample.get)
-                AvroCompactor.writeRecords(List(record), filename, fs)
+                AvroCompactor.writeRecords(List(record), path, fs)
 
-                val records = AvroCompactor.readRecords[benchrows](record.getSchema(), filename, fs)
+                val records = AvroCompactor.readRecords[benchrows](record.getSchema(), path, fs)
                 val diskRecord = records.next()
                 assert(record == diskRecord)
             }
@@ -65,19 +84,41 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
         it("compact a few files, and ensure schema is the same"){
 
         }
-        it("compact some files into a smaller number of files, and ensure same content"){
+        it("compact fixed number files into a a single file, and ensure same content"){
             new HdfsFixture {
-                val filename_prefix = genFileName.sample.get
-                val filenames = (1 to 20).map( i => filename_prefix + i.toString())
-                val record = new tryllerylle.benchrows("012345678", "9ABCDEFG")
-                var records = (1 to 20).toList.map(i => record)
-                filenames.foreach(filename => AvroCompactor.writeRecords(records, filename, fs))
                 val homeDir = fs.getHomeDirectory()
-                val files = spark.sparkContext.binaryFiles(homeDir.toString())
+                val badfilesDir = new Path(homeDir.toString()+ "/badfiles")
+                fs.mkdirs(badfilesDir)
+                val filename_prefix = genFileName.sample.get
+                val file_count = 20
+                val filenames = (1 to file_count).map( 
+                    i => new Path(badfilesDir.toString + "/" + filename_prefix + i.toString())
+                )
+                val record = TestHelpers.fixed_record()
+                val record_count = 20
+                var records = (1 to record_count).toList.map(i => record)
+                filenames.foreach(filename => AvroCompactor.writeRecords(records, filename, fs))
+                val files = spark.sparkContext.binaryFiles(badfilesDir.toString())
                 println("ITS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% HAPPENING")
-                files.foreach{
-                    case (filename, stream) => println(filename)
+
+                
+                files.map(v => (TestHelpers.compactedFilename, Vector(v))).reduceByKey{
+                    case (v1, v2) => v1 ++ v2
                 }
+                .foreach{
+                    v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), TestHelpers.fixed_record())
+                }
+
+                val avroFile = new Path(TestHelpers.compactedFilename)
+                val writtenRecords = AvroCompactor.readRecords[benchrows](
+                    TestHelpers.fixed_record().getSchema(), 
+                    avroFile, 
+                    fs).toArray
+
+                assert(writtenRecords.length == file_count * record_count)
+                for (r <- writtenRecords) assert(r == TestHelpers.fixed_record())
+            
+
                 println("ITTTTTT ended ...")
             }
         }
@@ -91,7 +132,7 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
         miniDfsConf.set("dfs.namenode.fs-limits.min-block-size", "1024")
         miniDfsConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, baseDir.getAbsolutePath)
         miniHdfs = new MiniDFSCluster.Builder(miniDfsConf)
-            .nameNodePort(port)
+            .nameNodePort(TestHelpers.port)
             .format(true)
             .build()
         miniHdfs.waitClusterUp()
