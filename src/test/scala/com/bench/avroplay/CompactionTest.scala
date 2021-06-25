@@ -114,9 +114,20 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 for (r <- writtenRecords) assert(r == TestHelpers.fixed_record())
 
             }
-            it("compact a few files, and ensure schema is the same"){
-                
+            it("a file doesnt exist ensure it fails with error message"){
+
             }
+            it("reads a broken files ensure it fails with error message"){
+
+            }
+            it("compact a few files, and ensure schema is the same"){
+                // Schema prop is not part of {hashcode, equals} so check the string repr :(
+
+            }
+            it("compact a few files of different 'evolution' and hope it doesnt break"){
+                // We need to manually write schema and data or there will be a namespace clash
+            }
+            
         }
     }
 

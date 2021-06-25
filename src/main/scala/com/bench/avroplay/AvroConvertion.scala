@@ -61,6 +61,7 @@ object AvroCompactor{
 
     /*
         Fix writer, ensure also correct compression snappy is used
+        TODO: Should we silently fail with empty vector, blow it up or log!?!?
     */
     def compactAvroFiles[T <: SpecificRecordBase](fileAvro: (String, Vector[(String, PortableDataStream)]))(implicit conf: Configuration, t: T) : Unit = {
         Try{

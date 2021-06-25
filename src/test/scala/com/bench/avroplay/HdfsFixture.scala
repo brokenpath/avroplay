@@ -14,4 +14,6 @@ trait HdfsFixture {
   } yield benchrows(str1, str2)
 
 
+  val genBenchrowFiles = Gen.nonEmptyListOf(Gen.listOf(genBenchrows))  
+
 }
