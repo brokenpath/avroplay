@@ -45,8 +45,9 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
     private val conf = TestHelpers.newConf() //needed for performing append operation on hadoop-minicluster
     val fs: FileSystem = FileSystem.get(conf)
     Logger.getLogger("org").setLevel(Level.OFF)
+    private val homeDir = fs.getHomeDirectory()
 
-    describe("modifyingFiles") {
+    describe("Basic test") {
         it("create file add, data and see its there") {
             println("")
             println("*********************************")
@@ -58,7 +59,6 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                     val out = fs.create(path, true, defaults.getFileBufferSize(), defaults.getReplication(), SMALL_BLOCKSIZE)
                     out.write(genChunk.sample.get)
                     out.close()
-                    val homeDir = fs.getHomeDirectory()
                     val files = fs.listStatus(homeDir)
                     for ( file <- files) {
                         println("--------------------------------------------------")
@@ -83,7 +83,6 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
         }
         it("compact fixed number files into a a single file, and ensure same content"){
             new HdfsFixture {
-                val homeDir = fs.getHomeDirectory()
                 val badfilesDir = new Path(homeDir.toString()+ "/badfiles")
                 fs.mkdirs(badfilesDir)
                 val filename_prefix = genFileName.sample.get
@@ -101,7 +100,8 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                     case (v1, v2) => v1 ++ v2
                 }
                 .foreach{
-                    v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), TestHelpers.fixed_record())
+                    v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), 
+                        TestHelpers.fixed_record())
                 }
 
                 val avroFile = new Path(TestHelpers.compactedFilename)
@@ -114,20 +114,42 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 for (r <- writtenRecords) assert(r == TestHelpers.fixed_record())
 
             }
-            it("a file doesnt exist ensure it fails with error message"){
+        }
+        it("a file doesnt exist ensure it fails with error message"){
+            val idontexist = new Path(homeDir.toString() + "/magicalfileonthemoon")
+            val files = spark.sparkContext.binaryFiles(idontexist.toString())
+            assertThrows[org.apache.hadoop.mapreduce.lib.input.InvalidInputException]{
+                files.map(v => (TestHelpers.compactedFilename, Vector(v))
+                    ).foreach {
+                    v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), 
+                            TestHelpers.fixed_record())
+                }
+            }
+        }
+        it("reads a broken files ensure it fails with error message"){
+            new HdfsFixture {
+                val brokenfile: Path = new Path(homeDir.toString() + "/brokenavro.avro")
+                val out = fs.create(brokenfile)
+                out.write(genChunk.sample.get)
+                out.close()
+                val files = spark.sparkContext.binaryFiles(brokenfile.toString())
+                //Inner exception is hidden which is not so great SparkException seems to generic
+                assertThrows[org.apache.spark.SparkException]{
+                    files.map(v => (TestHelpers.compactedFilename, Vector(v))
+                        ).foreach {
+                        v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), 
+                                TestHelpers.fixed_record())
+                        }
+                }
+            }
 
-            }
-            it("reads a broken files ensure it fails with error message"){
+        }
+        it("compact a few files, and ensure schema is the same"){
+            // Schema prop is not part of {hashcode, equals} so check the string repr :(
 
-            }
-            it("compact a few files, and ensure schema is the same"){
-                // Schema prop is not part of {hashcode, equals} so check the string repr :(
-
-            }
-            it("compact a few files of different 'evolution' and hope it doesnt break"){
-                // We need to manually write schema and data or there will be a namespace clash
-            }
-            
+        }
+        it("compact a few files of different 'evolution' and hope it doesnt break"){
+            // We need to manually write schema and data or there will be a namespace clash
         }
     }
 
