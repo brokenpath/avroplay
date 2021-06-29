@@ -38,7 +38,7 @@ object AvroCompactor{
             val out = fs.create(path, true)
             val datumWriter = new SpecificDatumWriter[T]()
             val dataFileWriter = new DataFileWriter[T](datumWriter) 
-            val record = records.head
+            val record = records.head //Will fail if empty
             val outputWriter = dataFileWriter.create(record.getSchema(), out)
             for(r <- records) outputWriter.append(r)
             outputWriter.close()
@@ -106,11 +106,11 @@ object Runner {
                 val datumReader = new SpecificDatumReader[benchrows](benchrows.SCHEMA$);
                 val dataFileReader = new DataFileStream[benchrows](inputStream, datumReader)
                 
-                val transformation = dataFileReader
-                    .iterator()
-                    .asScala
-                    .map(r => r.copy(secondfield =  "i made it") )
-                    .filter(r => r.firstfield == "nogo")
+                // val transformation = dataFileReader
+                //     .iterator()
+                //     .asScala
+                //     .map(r => r.copy(secondfield =  "i made it") )
+                //     .filter(r => r.firstfield == "nogo")
                 
                 inputStream.close() //is this necesarry 
         }
