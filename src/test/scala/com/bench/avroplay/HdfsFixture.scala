@@ -16,7 +16,7 @@ trait HdfsFixture {
   } yield WithSchemaProp(str1, str2, str3)
 
 
-  val genWithSchemaPropFiles = Gen.nonEmptyListOf(Gen.nonEmptyListOf(genWithSchemaProp))  
+  val genWithSchemaPropFiles = Gen.nonEmptyListOf(Gen.listOf(genWithSchemaProp))  
 
 
   val gen4Tuple = for {

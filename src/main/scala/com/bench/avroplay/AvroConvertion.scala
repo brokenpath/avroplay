@@ -5,7 +5,6 @@ import org.apache.avro.file.{DataFileStream, DataFileWriter, DataFileReader}
 import org.apache.spark.{SparkConf, SparkContext} 
 import tryllerylle._
 import org.apache.avro.specific.SpecificRecordBase
-import collection.JavaConverters._
 import org.apache.avro.specific.SpecificDatumReader
 import tryllerylle.benchrows
 import org.apache.spark.rdd.RDD
@@ -21,6 +20,7 @@ import org.apache.avro.file.DataFileReader
 import org.apache.hadoop.fs.FsServerDefaults
 import org.apache.avro.file.SeekableFileInput
 import java.{util => ju}
+import org.apache.spark.sql.SparkSession
 
 object Main extends App {
     val (inputFile, outputFile) = (args(0), args(1))
@@ -30,34 +30,6 @@ object Main extends App {
 case class valueContainer(path: String)
 
 object AvroCompactor{
-    //Test method likely to be moved
-    def writeRecords[T <: SpecificRecordBase](
-        records : List[T], 
-        path: Path, 
-        fs: FileSystem) = {
-            val out = fs.create(path, true)
-            val datumWriter = new SpecificDatumWriter[T]()
-            val dataFileWriter = new DataFileWriter[T](datumWriter) 
-            val record = records.head //Will fail if empty
-            val outputWriter = dataFileWriter.create(record.getSchema(), out)
-            for(r <- records) outputWriter.append(r)
-            outputWriter.close()
-    }
-
-    //Test method likely to be moved
-    def readRecords[T <: SpecificRecordBase](
-        schema: Schema,
-        path: Path, 
-        fs: FileSystem) = {
-            val in = fs.open(path)
-            val datumReader = new SpecificDatumReader[T](schema)
-            val reader : java.util.Iterator[T] =  new DataFileStream(in, datumReader) // Type inference failes :'(
-            
-            val records = for(record <- reader.asScala) yield record
-            in.close()
-            records
-        }
-
 
     /*
         Fix writer, ensure also correct compression snappy is used

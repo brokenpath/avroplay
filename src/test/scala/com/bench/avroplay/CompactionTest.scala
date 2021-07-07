@@ -2,6 +2,8 @@ package com.bench.avroplay
 
 import java.io.File
 
+
+import collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.FunSpec
@@ -16,9 +18,43 @@ import org.apache.avro.generic.GenericDatumWriter
 import org.apache.avro.file.DataFileWriter
 import org.apache.avro.generic.GenericRecord
 import com.bench.avrotypes.WithSchemaProp
+import org.apache.avro.specific.SpecificRecordBase
+import org.apache.avro.specific.SpecificDatumWriter
+import org.apache.avro.Schema
+import org.apache.avro.specific.SpecificDatumReader
+import org.apache.avro.file.DataFileStream
 
 
 object TestHelpers {
+
+        //Test method likely to be moved
+    def writeRecords[T <: SpecificRecordBase](
+        record: T,
+        records : List[T], 
+        path: Path, 
+        fs: FileSystem) = {
+            val out = fs.create(path, true)
+            val datumWriter = new SpecificDatumWriter[T]()
+            val dataFileWriter = new DataFileWriter[T](datumWriter) 
+            val outputWriter = dataFileWriter.create(record.getSchema(), out)
+            for(r <- records) outputWriter.append(r)
+            outputWriter.close()
+    }
+
+    //Test method likely to be moved
+    def readRecords[T <: SpecificRecordBase](
+        schema: Schema,
+        path: Path, 
+        fs: FileSystem) = {
+            val in = fs.open(path)
+            val datumReader = new SpecificDatumReader[T](schema)
+            val reader : java.util.Iterator[T] =  new DataFileStream(in, datumReader) // Type inference failes :'(
+            
+            val records = for(record <- reader.asScala) yield record
+            in.close()
+            records
+        }
+        
     def test( t: (String, PortableDataStream ), s : String ) = 
         (s, t) 
 
@@ -77,9 +113,9 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
             new HdfsFixture {
                 val path =  new Path(genFileName.sample.get)
                 val record = new tryllerylle.benchrows(genFileName.sample.get, genFileName.sample.get)
-                AvroCompactor.writeRecords(List(record), path, fs)
+                TestHelpers.writeRecords(benchrows("",""), List(record), path, fs)
 
-                val records = AvroCompactor.readRecords[benchrows](record.getSchema(), path, fs)
+                val records = TestHelpers.readRecords[benchrows](record.getSchema(), path, fs)
                 val diskRecord = records.next()
                 assert(record == diskRecord)
             }
@@ -96,7 +132,7 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 val record = TestHelpers.fixed_record()
                 val record_count = 20
                 val records = (1 to record_count).toList.map(i => record)
-                filenames.foreach(filename => AvroCompactor.writeRecords(records, filename, fs))
+                filenames.foreach(filename => TestHelpers.writeRecords(TestHelpers.fixed_record(), records, filename, fs))
                 val files = spark.sparkContext.binaryFiles(badfilesDir.toString())
                 
                 files.map(v => (TestHelpers.compactedFilename, Vector(v))).reduceByKey{
@@ -108,7 +144,7 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 }
 
                 val avroFile = new Path(TestHelpers.compactedFilename)
-                val writtenRecords = AvroCompactor.readRecords[benchrows](
+                val writtenRecords = TestHelpers.readRecords[benchrows](
                     TestHelpers.fixed_record().getSchema(), 
                     avroFile, 
                     fs).toArray
@@ -151,26 +187,19 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
             // Schema prop is not part of {hashcode, equals} so check the string repr :(
             new HdfsFixture {
                 val data = genWithSchemaPropFiles.sample.get
-                val headIsEmpty = data.map(  l => 
-                    l.headOption.isEmpty.toString()).
-                    reduce[String] {
-                        case (b1,b2) => b1 + ", " + b2
-                    }
+                val baserecord = WithSchemaProp("test", None, None)
 
-                
-                println("##########################")
-                println(s"Is the head empty: $headIsEmpty")
                 val diffschemadir = new Path(homeDir.toString()+ "/diffschemadir")
                 fs.mkdirs(diffschemadir)
                 val prefix = genFileName.sample.get
                 val absolutePrefix = diffschemadir.toString() + "/" + prefix
                 var i = 0
                 def nexti() = { i = i + 1; i.toString()}
-                data.foreach(records => AvroCompactor.writeRecords(records, new Path( absolutePrefix + nexti()), fs))
+                data.foreach(records => TestHelpers.writeRecords(baserecord, records, new Path( absolutePrefix + nexti()), fs))
 
                 ////// Devolved records
                 val recordbuilder = new GenericRecordBuilder(TestHelpers.devolvedWithSchemaProp)
-                val devolvedRecords = getListOfStr(1234).sample.get.map{
+                val devolvedRecords = getListOfStr(123).sample.get.map{
                     v1 =>
                      {
                         recordbuilder.set("firstfield", v1) 
@@ -212,13 +241,14 @@ class CompactionTest extends FunSpec with BeforeAndAfterAll with BeforeAndAfterE
                 files.map(v => (TestHelpers.compactedFilename, Vector(v))).reduceByKey{
                     case (v1, v2) => v1 ++ v2
                 }.foreach{
-                    v => AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(), 
-                        WithSchemaProp("test", None, None))
+                    v => 
+                        AvroCompactor.compactAvroFiles(v)(TestHelpers.newConf(),  
+                            WithSchemaProp("test", None, None)
+                        )
                 }
 
                 
             }
-
         }
     }
 
